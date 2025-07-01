@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Chat</title>
+    <!-- Tailwind CSS CDN for easy styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #chat-container {
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #messages {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            scroll-behavior: smooth;
+        }
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+        .user-message {
+            align-self: flex-end;
+            background-color: #0A7CFF; /* A vibrant blue for user */
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+        .ai-message {
+            align-self: flex-start;
+            background-color: #e2e8f0; /* Light gray for AI */
+            color: #333;
+            border-bottom-left-radius: 5px;
+        }
+        #input-area {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #e2e8f0;
+            gap: 10px;
+        }
+        #user-input {
+            flex-grow: 1;
+            padding: 12px 18px;
+            border: 1px solid #cbd5e1;
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        #user-input:focus {
+            border-color: #0A7CFF;
+        }
+        #send-button {
+            background-color: #0A7CFF;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background-color 0.2s, transform 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #send-button:hover {
+            background-color: #005bb5;
+        }
+        #send-button:active {
+            transform: scale(0.98);
+        }
+        #send-button:disabled {
+            background-color: #a0aec0;
+            cursor: not-allowed;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="messages">
+            <!-- Chat messages will be appended here -->
+        </div>
+        <div id="input-area">
+            <input type="text" id="user-input" placeholder="Type your message...">
+            <button id="send-button">
+                Send
+                <div id="loading-indicator" class="loading-spinner hidden ml-2"></div>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const messagesDiv = document.getElementById('messages');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        // In-memory store for chat history (per session ID)
+        const chatStore = {};
+
+        // A fixed session ID for this simple frontend.
+        // In a real app, this would come from user login or be dynamically generated.
+        const SESSION_ID = "frontend_user_session_123";
+
+        // Function to add a message to the display
+        function addMessage(sender, text) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            if (sender === 'user') {
+                messageElement.classList.add('user-message');
+            } else {
+                messageElement.classList.add('ai-message');
+            }
+            messageElement.textContent = text;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll to bottom
+        }
+
+        // Function to get or create chat history for a session
+        function getChatHistory(sessionId) {
+            if (!chatStore[sessionId]) {
+                chatStore[sessionId] = []; // Array of {role: "user"|"model", parts: [{text: "..."}]}
+            }
+            return chatStore[sessionId];
+        }
+
+        // Function to send message to Gemini API
+        async function sendMessage() {
+            const messageText = userInput.value.trim();
+            if (!messageText) return;
+
+            addMessage('user', messageText);
+            userInput.value = ''; // Clear input field
+            sendButton.disabled = true;
+            loadingIndicator.classList.remove('hidden');
+            sendButton.textContent = ''; // Clear text to show spinner
+
+            const currentChatHistory = getChatHistory(SESSION_ID);
+
+            // Add the user's message to the history
+            currentChatHistory.push({ role: "user", parts: [{ text: messageText }] });
+
+            try {
+                // Construct the payload for the Gemini API
+                const payload = {
+                    contents: currentChatHistory,
+                    generationConfig: {
+                        temperature: 0.7, // You can adjust this
+                        maxOutputTokens: 800, // Limit output tokens
+                    }
+                };
+
+                // The API key
+                //const apiKey = "";
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API error: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
+                }
+
+                const result = await response.json();
+
+                let aiResponseText = "Sorry, I couldn't get a response.";
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    aiResponseText = result.candidates[0].content.parts[0].text;
+                } else {
+                    console.error("Unexpected API response structure:", result);
+                }
+
+                addMessage('ai', aiResponseText);
+                // Add AI's response to the history
+                currentChatHistory.push({ role: "model", parts: [{ text: aiResponseText }] });
+
+            } catch (error) {
+                console.error("Error sending message:", error);
+                addMessage('ai', "Oops! Something went wrong. Please try again.");
+            } finally {
+                sendButton.disabled = false;
+                loadingIndicator.classList.add('hidden');
+                sendButton.textContent = 'Send'; // Restore text
+            }
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Initial welcome message
+        addMessage('ai', "Hello! How can I help you today?");
+    </script>
+</body>
+</html>
