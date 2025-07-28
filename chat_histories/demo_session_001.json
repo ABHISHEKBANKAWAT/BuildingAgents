@@ -1,0 +1,22 @@
+[
+  {
+    "type": "human",
+    "content": "Hello! How are you today?",
+    "timestamp": "2025-07-28T07:56:13.450207"
+  },
+  {
+    "type": "ai",
+    "content": "I'm doing well, thank you! How are you?",
+    "timestamp": "2025-07-28T07:56:13.450218"
+  },
+  {
+    "type": "human",
+    "content": "What was my first message to you?",
+    "timestamp": "2025-07-28T07:56:13.450222"
+  },
+  {
+    "type": "ai",
+    "content": "Your first message was \"Hello! How are you today?\"",
+    "timestamp": "2025-07-28T07:56:13.450226"
+  }
+]
